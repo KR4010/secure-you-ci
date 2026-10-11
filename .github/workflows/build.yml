@@ -135,7 +135,7 @@ jobs:
           export EXPO_ASC_API_KEY_PATH="$RUNNER_TEMP/secure-you-asc.p8"
           umask 077
           printf '%s' "$ASC_API_KEY_P8_BASE64" | base64 --decode > "$EXPO_ASC_API_KEY_PATH"
-          eas submit --platform ios --profile testflight --path "$RUNNER_TEMP/secure-you.ipa" --non-interactive
+          eas submit --platform ios --profile testflight --path "$RUNNER_TEMP/secure-you.ipa" --non-interactive --no-auto-testflight-setup --wait
           eas submit:status --platform ios --profile testflight --json --non-interactive
       - name: Clean private build and credentials
         if: always()
