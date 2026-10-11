@@ -106,6 +106,21 @@ jobs:
           xcodebuild -version
       - name: Build store IPA on the runner
         run: eas build --platform ios --profile testflight --local --non-interactive --output "$RUNNER_TEMP/secure-you.ipa"
+      - name: Verify the signed archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -q "$RUNNER_TEMP/secure-you.ipa" -d "$RUNNER_TEMP/secure-you-archive"
+          app=("$RUNNER_TEMP/secure-you-archive"/Payload/*.app)
+          test "${#app[@]}" -eq 1
+          /usr/bin/codesign --verify --deep --strict "${app[0]}"
+          info="${app[0]}/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$info")" = com.ritzakku.secureyou
+          test "$(/usr/libexec/PlistBuddy -c 'Print ITSAppUsesNonExemptEncryption' "$info")" = true
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$info")
+          build=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$info")
+          echo "Verified Secure You $version ($build), source ${{ needs.checks.outputs.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          rm -rf "$RUNNER_TEMP/secure-you-archive"
       - name: Submit this IPA to TestFlight
         if: env.WILL_SUBMIT == 'true'
         env:
@@ -125,3 +140,4 @@ jobs:
         if: always()
         run: |
           rm -f "$RUNNER_TEMP/secure-you-asc.p8" "$RUNNER_TEMP/secure-you.ipa"
+          rm -rf "$RUNNER_TEMP/secure-you-archive"
