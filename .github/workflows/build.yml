@@ -1,0 +1,120 @@
+name: Secure You CI / TestFlight
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Private app branch or full commit SHA
+        default: main
+        required: true
+        type: string
+      build:
+        description: Build iOS after checks
+        default: true
+        type: boolean
+      submit:
+        description: Submit the resulting IPA to TestFlight
+        default: true
+        type: boolean
+  repository_dispatch:
+    types: [release]
+permissions:
+  contents: read
+concurrency:
+  group: secure-you-release
+  cancel-in-progress: false
+env:
+  APP_REPO: KR4010/secure-you
+  NODE_VERSION: '22'
+  EAS_VERSION: '23.2.0'
+jobs:
+  checks:
+    if: github.event_name == 'workflow_dispatch' || github.event.sender.login == 'KR4010'
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.revision.outputs.sha }}
+    steps:
+      - name: Check out private app
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.APP_REPO }}
+          ref: ${{ inputs.ref || github.event.client_payload.sha || 'main' }}
+          ssh-key: ${{ secrets.APP_REPO_SSH_KEY }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Pin and verify source revision
+        id: revision
+        run: |
+          git merge-base --is-ancestor HEAD origin/main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+  ios:
+    needs: checks
+    if: github.event_name == 'repository_dispatch' || inputs.build
+    runs-on: macos-26
+    timeout-minutes: 90
+    environment: testflight
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+      EXPO_APPLE_TEAM_ID: ${{ secrets.EXPO_TEAM_ID }}
+      WILL_SUBMIT: ${{ github.event_name == 'repository_dispatch' || inputs.submit }}
+    steps:
+      - name: Check out the checked revision
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.APP_REPO }}
+          ref: ${{ needs.checks.outputs.sha }}
+          ssh-key: ${{ secrets.APP_REPO_SSH_KEY }}
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm install -g eas-cli@${{ env.EAS_VERSION }}
+      - name: Preflight before compiling
+        env:
+          ASC_P8: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in EXPO_TOKEN EXPO_APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then echo "::error::Missing $name"; exit 1; fi
+          done
+          if [ "$WILL_SUBMIT" = true ]; then
+            for name in ASC_APP_ID ASC_P8 ASC_KEY_ID ASC_ISSUER_ID; do
+              if [ -z "${!name}" ]; then echo "::error::Missing $name"; exit 1; fi
+            done
+            printf '%s' "$ASC_P8" | base64 --decode > /dev/null
+            node scripts/configure-submit.mjs
+          fi
+          eas whoami
+          xcodebuild -version
+      - name: Build store IPA on the runner
+        run: eas build --platform ios --profile testflight --local --non-interactive --output "$RUNNER_TEMP/secure-you.ipa"
+      - name: Submit this IPA to TestFlight
+        if: env.WILL_SUBMIT == 'true'
+        env:
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          EXPO_ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          EXPO_APPLE_TEAM_TYPE: INDIVIDUAL
+        shell: bash
+        run: |
+          set -euo pipefail
+          export EXPO_ASC_API_KEY_PATH="$RUNNER_TEMP/secure-you-asc.p8"
+          umask 077
+          printf '%s' "$ASC_API_KEY_P8_BASE64" | base64 --decode > "$EXPO_ASC_API_KEY_PATH"
+          eas submit --platform ios --profile testflight --path "$RUNNER_TEMP/secure-you.ipa" --non-interactive
+          eas submit:status --platform ios --profile testflight --json --non-interactive
+      - name: Clean private build and credentials
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/secure-you-asc.p8" "$RUNNER_TEMP/secure-you.ipa"
