@@ -117,7 +117,7 @@ jobs:
           /usr/bin/codesign --verify --deep --strict "${app[0]}"
           info="${app[0]}/Info.plist"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$info")" = com.ritzakku.secureyou
-          test "$(/usr/libexec/PlistBuddy -c 'Print ITSAppUsesNonExemptEncryption' "$info")" = true
+          node scripts/verify-ios-encryption.mjs "${app[0]}"
           version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$info")
           build=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$info")
           echo "Verified Secure You $version ($build), source ${{ needs.checks.outputs.sha }}" >> "$GITHUB_STEP_SUMMARY"
