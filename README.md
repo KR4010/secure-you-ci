@@ -13,7 +13,7 @@ Checks run on Linux first: TypeScript, lint, domain tests, and an iOS Metro bund
 - ASC_API_KEY_P8_BASE64: base64 App Store Connect private API key.
 - ASC_KEY_ID and ASC_ISSUER_ID: API key identifiers.
 
-Apple signing certificates and the Secure You provisioning profile must be configured with `eas credentials:configure-build -p ios -e testflight` once before unattended builds. The SQLCipher build uses encryption; resolve Apple's export-compliance requirements for the app before testers can install it.
+Apple signing certificates and the Secure You provisioning profile must be configured with `eas credentials:configure-build -p ios -e testflight` once before unattended builds. The iOS SQLCipher build uses Apple CommonCrypto. The signed archive's exempt-encryption declaration and OS crypto references are verified before submission. Reassess compliance before introducing another cryptographic backend.
 
 ## Run
 
