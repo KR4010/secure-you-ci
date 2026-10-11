@@ -100,6 +100,7 @@ jobs:
               if [ -z "${!name}" ]; then echo "::error::Missing $name"; exit 1; fi
             done
             printf '%s' "$ASC_P8" | base64 --decode > /dev/null
+            node scripts/verify-apple-app.mjs
             node scripts/configure-submit.mjs
           fi
           eas whoami
