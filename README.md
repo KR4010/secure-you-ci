@@ -17,6 +17,6 @@ Apple signing certificates and the Secure You provisioning profile must be confi
 
 ## Run
 
-Actions → Secure You CI / TestFlight → Run workflow. Select main or a full source SHA. Turn build off for checks only. Turn submit off to compile without uploading. Pushes to private main dispatch an iOS build and TestFlight submission via CI_DISPATCH_TOKEN stored only in the private repo.
+Actions → Secure You CI / TestFlight → Run workflow. Select main or a full source SHA. Turn build off for checks only. Turn submit off to compile without uploading. Pushes to private main always dispatch checks via CI_DISPATCH_TOKEN stored only in the private repo. Setting TESTFLIGHT_READY=true in the private app repo enables build and TestFlight submission after the checks.
 
 Submissions use the exact IPA produced in the job. EAS submission completion establishes upload, not tester availability. Inspect App Store Connect processing, encryption compliance, and internal group assignment separately. Public logs must never include journal fixtures, keys, `.env`, or application source dumps.
