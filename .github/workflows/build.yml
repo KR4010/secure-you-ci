@@ -62,6 +62,9 @@ jobs:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
       EXPO_APPLE_TEAM_ID: ${{ secrets.EXPO_TEAM_ID }}
+      EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      EXPO_ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      EXPO_APPLE_TEAM_TYPE: INDIVIDUAL
       WILL_SUBMIT: ${{ github.event_name == 'repository_dispatch' || inputs.submit }}
     steps:
       - name: Check out the checked revision
@@ -85,9 +88,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in EXPO_TOKEN EXPO_APPLE_TEAM_ID; do
+          for name in EXPO_TOKEN EXPO_APPLE_TEAM_ID ASC_P8 ASC_KEY_ID ASC_ISSUER_ID; do
             if [ -z "${!name}" ]; then echo "::error::Missing $name"; exit 1; fi
           done
+          export EXPO_ASC_API_KEY_PATH="$RUNNER_TEMP/secure-you-asc.p8"
+          umask 077
+          printf '%s' "$ASC_P8" | base64 --decode > "$EXPO_ASC_API_KEY_PATH"
+          echo "EXPO_ASC_API_KEY_PATH=$EXPO_ASC_API_KEY_PATH" >> "$GITHUB_ENV"
           if [ "$WILL_SUBMIT" = true ]; then
             for name in ASC_APP_ID ASC_P8 ASC_KEY_ID ASC_ISSUER_ID; do
               if [ -z "${!name}" ]; then echo "::error::Missing $name"; exit 1; fi
