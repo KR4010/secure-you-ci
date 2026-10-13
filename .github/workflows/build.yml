@@ -60,6 +60,7 @@ jobs:
     environment: testflight
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_REVENUECAT_KEY_IOS: ${{ secrets.EXPO_PUBLIC_REVENUECAT_KEY_IOS }}
       ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
       EXPO_APPLE_TEAM_ID: ${{ secrets.EXPO_TEAM_ID }}
       EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -80,6 +81,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm install -g eas-cli@${{ env.EAS_VERSION }}
+      - name: Verify encryption review before TestFlight upload
+        if: env.WILL_SUBMIT == 'true'
+        run: |
+          node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync("release/readiness.json")); if(r.checks.backupCryptoExportClassification!==true){console.error("Encryption declaration for this backup implementation is awaiting review. Run checks with build=false and submit=false."); process.exit(1)}'
       - name: Preflight before compiling
         env:
           ASC_P8: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
